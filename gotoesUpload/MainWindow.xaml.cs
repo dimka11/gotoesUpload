@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Controls;
 
 
 namespace gotoesUpload
@@ -12,126 +13,79 @@ namespace gotoesUpload
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
+    ///
     public partial class MainWindow : Window
     {
+        public UIState UiState;
+        public Uploader Uploader;
+        public Downloader Downloader;
+        public ActivitySettings ActivitySettings;
+        private string[] _filesFromDrop;
         public MainWindow()
         {
             InitializeComponent();
+            UiState = new UIState(this);
+            Uploader = new Uploader(UiState);
+            Uploader.FilesWereUploaded += AfterUpload;
+            ActivitySettings = new ActivitySettings(UiState);
+            Downloader = new Downloader(ActivitySettings);
+            Downloader.FileWasDownload += AfterDownload;
+        }
+
+        public void AfterUpload(object sender, EventArgs e)
+        {
+            UiState.UpdateDropArea("Files were uploaded, wait...");
+            Downloader.DownloadMergedFile((e as Uploader.FilesWereUploadedEventArgs).ActivityNumber);
+        }
+
+        public void AfterDownload(object sender, EventArgs e)
+        {
+            UIState.ShowMessage("File was downloaded");
+            UiState.UpdateDropArea("Drop Files Here");
         }
 
         private void UIElement_OnDrop(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            var files = UiState.OnDrop(sender, e);
+            _filesFromDrop = files;
+            ActivitySettings.FileNames = files;
+            UiState.GetState().AutoUpload = (bool)CheckBoxAutoUpload.IsChecked;
+            if (UiState.GetState().AutoUpload)
             {
-                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-
-                DropAreaLabel.Content = "";
-                foreach (var file in files)
-                {
-                    DropAreaLabel.Content = DropAreaLabel.Content + file.Split("\\")[file.Split("\\").Length - 1] + "\n";
-                }
-                
-                LoadFiles(files);
+                StartUploading(files);
             }
         }
 
-        private void LoadFiles(string[] files)
+        private void ListBoxSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var filesContent = new List<byte[]>();
-            foreach (var filename in files)
-            {
-                filesContent.Add(File.ReadAllBytes(filename));
-            }
-            UploadFiles(filesContent, files);
+            UiState.UpdateState().ActivityType = ((sender as ListBox).SelectedItem as ListBoxItem).Content.ToString();
         }
 
-        private async void UploadFiles(List<byte[]> filesContent, string[] names)
+        private void ToggleButton_OnChecked(object sender, RoutedEventArgs e)
         {
-            HttpClient httpClient = new HttpClient();
-            MultipartFormDataContent form = new MultipartFormDataContent();
-
-            foreach (var file_bytes in Enumerable.Zip(filesContent, names))
+            if (UiState is not null)
             {
-                form.Add(new ByteArrayContent(file_bytes.First, 0, file_bytes.First.Length), "files[]", file_bytes.Second);
+                UiState.UpdateState().AutoUpload = (bool)((CheckBox)sender).IsChecked;
             }
-
-            HttpResponseMessage response = await httpClient.PostAsync("https://gotoes.org/strava/upload.php", form);
-
-            response.EnsureSuccessStatusCode();
-            httpClient.Dispose();
-            string html = response.Content.ReadAsStringAsync().Result;
-
-            var splits = html.Split("=");
-            var activity_number = splits[3].Split("&")[0];
-            var url_link = $"https://gotoes.org/strava/upload.php?f={activity_number}";
-            DownloadMergedFile(url_link, activity_number, names);
         }
 
-        private async void DownloadMergedFile(string url_link, string activity_number, string[] names)
+        private void ToggleButton_OnUnchecked(object sender, RoutedEventArgs e)
         {
-            HttpClient httpClient = new HttpClient();
-            HttpResponseMessage response = await httpClient.GetAsync(url_link);
-
-            response.EnsureSuccessStatusCode();
-            string html = response.Content.ReadAsStringAsync().Result;
-
-
-            // Request to upload url
-            var formContent = new FormUrlEncodedContent(new[]
+            if (UiState is not null)
             {
-                new KeyValuePair<string, string>("lat[2]", "Y"),
-                new KeyValuePair<string, string>("ele[2]", "Y"),
-                new KeyValuePair<string, string>("hr[1]", "Y"),
-                new KeyValuePair<string, string>("cad[1]", "Y"),
-                new KeyValuePair<string, string>("outputFormat", "GPX"),
-                new KeyValuePair<string, string>("spoofGPS", "0_--No+GPS+SELECTED--"),
-                new KeyValuePair<string, string>("ActivitySport", "Running"),
-                new KeyValuePair<string, string>("ops", "OTP"),
-                new KeyValuePair<string, string>("dtp", "0"),
-                new KeyValuePair<string, string>("iHR", ""),
-                new KeyValuePair<string, string>("discardHR", ""),
-                new KeyValuePair<string, string>("suppliedName", ""),
-                new KeyValuePair<string, string>("f", activity_number),
-                new KeyValuePair<string, string>("isPatreon", ""),
-                new KeyValuePair<string, string>("sortedFileNames", $"{names[1].Split("\\")[^1]}_1,{names[0].Split("\\")[^1]}_2"),
-                new KeyValuePair<string, string>("timeZoneAdjustmentFactor", "21600"),
-            });
-            var upload_resp = await httpClient.PostAsync("https://gotoes.org/strava/upload.php", formContent);
-            var statusCode = upload_resp.StatusCode;
-            if (statusCode != HttpStatusCode.MovedPermanently)
-            {
-                File.AppendAllText("log.txt", $"status code of upload post request: {statusCode}");
-                // throw new Exception($"invalid status code: {statusCode}");
+                UiState.UpdateState().AutoUpload = (bool)((CheckBox)sender).IsChecked;
             }
-
-            var download_url =
-                $"https://gotoes.org/strava/downloader.php?sts=&d=downloads&s=Running&f={activity_number}.gpx&aba=&suppliedName=";
-            response = await httpClient.GetAsync(download_url);
-            upload_resp.EnsureSuccessStatusCode();
-
-            var downloadedFileName = response.Content.Headers.ContentDisposition?.FileName ?? string.Empty;
-
-            if (downloadedFileName == "")
-            {
-                downloadedFileName = "error.html";
-            }
-
-            downloadedFileName = downloadedFileName.Replace("\"", "");
-
-            Stream streamToReadFrom = await response.Content.ReadAsStreamAsync();
-
-            httpClient.Dispose();
-            Stream file = File.Create(downloadedFileName);
-            streamToReadFrom.CopyTo(file);
-            file.Close();
-            MessageBox.Show("Файл загружен");
-            DropAreaLabel.Content = "Drop Files Here";
         }
 
-        private void ButtonTest_Click(object sender, RoutedEventArgs e)
+        public async void StartUploading(string[] files)
         {
-            MessageBox.Show("Test message");
+            if (files.Length != 0) if (UiState.CheckFileExtension(files)) await Uploader.LoadFiles(files);
+                else UIState.ShowMessage("Should be only gpx or tcx files");
+        }
+
+        private void ButtonUpload_OnClick(object sender, RoutedEventArgs e)
+        {
+            StartUploading(_filesFromDrop);
         }
     }
-
 }

@@ -6,8 +6,22 @@ using System.Threading.Tasks;
 
 namespace gotoesUpload
 {
-    class ActivitySettings
+    public class ActivitySettings
     {
+        private UIState uiState;
+        public ActivitySettings(UIState uiState)
+        {
+            this.uiState = uiState;
+            ActivityType = uiState.GetState().ActivityType;
+        }
 
+        public string[] FileNames { get; set; }
+
+        public string ActivityType { get; set; }
+
+        public void Update()
+        {
+
+        }
     }
 }

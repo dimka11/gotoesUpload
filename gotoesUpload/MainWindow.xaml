@@ -5,15 +5,25 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gotoesUpload"
         mc:Ignorable="d"
-        Title="gotoesUpload" Height="450" Width="680">
-    <Grid Margin="0,0,0,235" HorizontalAlignment="Left" Width="537">
-        <Border BorderBrush="Black" BorderThickness="1">
-            <StackPanel Drop="UIElement_OnDrop" AllowDrop="True" Background="AntiqueWhite" Margin="0,0,-1,0">
-                <Label Content="Drop Files Here" Height="197" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Width="540" Name="DropAreaLabel"/>
+        Title="gotoesUpload" Height="300" Width="692">
+    <Grid Margin="0,0,0,0" HorizontalAlignment="Left" Width="537">
+        <Border BorderBrush="Black" BorderThickness="1" Margin="0,0,0,142">
+            <StackPanel Name="DropArea" Drop="UIElement_OnDrop" AllowDrop="True" Background="AntiqueWhite" Margin="0,0,-1,0">
+                <Label Content="Drop Files Here" Height="120" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Width="540" Name="DropAreaLabel"/>
             </StackPanel>
         </Border>
         <Border>
-            <Button Content="Test" HorizontalAlignment="Right" Margin="0,16,-107,0" VerticalAlignment="Top" Width="90" Click="ButtonTest_Click"/>
+            <StackPanel Margin="539,2,-143,2" >
+                <ListBox Height="24" Margin="5" SelectionChanged="ListBoxSelectionChanged" SelectionMode="Single">
+                    <ListBoxItem>Running</ListBoxItem>
+                    <ListBoxItem>Biking</ListBoxItem>
+                    <ListBoxItem>Walking</ListBoxItem>
+                </ListBox>
+                <Button Name="ButtonUpload" Content="Upload" Margin="10" Click="ButtonUpload_OnClick"/>
+            </StackPanel>
         </Border>
+        <StackPanel VerticalAlignment="Top" Margin="0,147,0,0" Height="140">
+            <CheckBox Name="CheckBoxAutoUpload" Content="Upload with Default Settings" Height="28" Width="180" HorizontalAlignment="Left" Margin="4, 4, 4, 4" IsChecked="True" Checked="ToggleButton_OnChecked" Unchecked="ToggleButton_OnUnchecked"/>
+        </StackPanel>
     </Grid>
 </Window>

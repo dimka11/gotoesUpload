@@ -18,7 +18,7 @@ namespace TestProject1
         [Test]
         public void Test2()
         {
-            var c = new gotoesUpload.Uploader();
+            // var c = new gotoesUpload.Uploader();
             Assert.AreEqual(0,1);
         }
     }
